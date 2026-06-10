@@ -8,6 +8,17 @@ import uy.edu.um.tad.binarytree.MySearchBinaryTreeImpl;
 import uy.edu.um.tad.queue.EmptyQueueException;
 import uy.edu.um.tad.queue.MyQueue;
 import uy.edu.um.tad.queue.MyQueueImpl;
+import uy.edu.um.doors.model.DoorUser;
+import uy.edu.um.doors.model.UserType;
+import uy.edu.um.tad.hash.MyHash;
+import uy.edu.um.tad.hash.MyHashImpl;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import uy.edu.um.doors.model.ProcessEvent;
+import uy.edu.um.tad.list.MyList;
+import uy.edu.um.tad.list.MyLinkedListImpl;
+import uy.edu.um.doors.model.EventType;
+
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -25,11 +36,16 @@ public class ProcessManagerImpl implements ProcessManager {
     private final MyQueue<DoorProcess> newProcesses = new MyQueueImpl<>();
     private final MySearchBinaryTree<ProcessPriorityKey, DoorProcess> pendingProcesses = new MySearchBinaryTreeImpl<>();
     private DoorProcess runningProcess;
+    private final MyHash<Integer, DoorUser> users = new MyHashImpl<>();
 
     @Override
     public void loadProcessAndUserData(String processCsvPath, String usersCsvPath) {
-        System.out.println("IMPLEMENTAR");
+        loadUsers(usersCsvPath);
+        System.out.println("Usuarios cargados: " + users.size());
+        loadProcesses(processCsvPath);
+        System.out.println("Procesos cargados: " + newProcesses.size());
     }
+
 
     @Override
     public void prepareProcesses() {
@@ -85,6 +101,88 @@ public class ProcessManagerImpl implements ProcessManager {
         System.out.println("IMPLEMENTAR");
     }
 
+    private void loadUsers(String usersCsvPath) {
+        try (BufferedReader reader = new BufferedReader(new FileReader(usersCsvPath))) {
+            reader.readLine(); // saltea el encabezado uid;alias;type
+            String line = reader.readLine();
+            while (line != null) {
+                if (!line.trim().isEmpty()) {
+                    String[] parts = line.split(";");
+                    int uid = Integer.parseInt(parts[0].trim());
+                    String alias = parts[1].trim();
+                    UserType type = UserType.valueOf(parts[2].trim());
+                    users.put(uid, new DoorUser(uid, alias, type));
+                }
+                line = reader.readLine();
+            }
+        } catch (IOException e) {
+            System.out.println("ERROR leyendo usuarios: " + e.getMessage());
+        }
+    }
+
+    private void loadProcesses(String processCsvPath) {
+        try (BufferedReader reader = new BufferedReader(new FileReader(processCsvPath))) {
+            reader.readLine();
+            String line = reader.readLine();
+            while (line != null) {
+                if (!line.trim().isEmpty()) {
+                    String[] parts = line.split(";");
+                    int pid = Integer.parseInt(parts[0].trim());
+                    int uid = Integer.parseInt(parts[1].trim());
+                    String name = parts[2].trim();
+
+                    DoorUser user = users.get(uid);
+
+                    MyList<ProcessEvent> events = parseEvents(parts[3]);
+
+
+                    DoorProcess process = new DoorProcess(pid, name, user, events);
+                    newProcesses.enqueue(process);
+                }
+                line = reader.readLine();
+            }
+        } catch (IOException e) {
+            System.out.println("ERROR leyendo procesos: " + e.getMessage());
+        }
+    }
+    private MyList<ProcessEvent> parseEvents(String eventsBlock) {
+        MyList<ProcessEvent> events = new MyLinkedListImpl<>();
+        String content = eventsBlock.trim();
+
+        // 1 Sacar las llaves { } de los bordes
+        content = content.substring(1, content.length() - 1);
+
+        // 2 Cortar por '#' para separar los eventos
+        String[] rawEvents = content.split("#");
+        for (int i = 0; i < rawEvents.length; i++) {
+            String rawEvent = rawEvents[i].trim();
+            if (rawEvent.isEmpty()) {
+                continue;
+            }
+
+            // 3
+            int colonIndex = rawEvent.indexOf(":");
+            String typeText = rawEvent.substring(0, colonIndex).trim();
+            String instructionsText = rawEvent.substring(colonIndex + 1).trim();
+
+            EventType type = EventType.valueOf(typeText);
+            // 4
+            instructionsText = instructionsText.substring(1, instructionsText.length() - 1);
+            MyList<String> instructions = new MyLinkedListImpl<>();
+            String[] rawInstructions = instructionsText.split(",");
+            for (int j = 0; j < rawInstructions.length; j++) {
+                String instruction = rawInstructions[j].trim();
+                if (!instruction.isEmpty()) {
+                    instructions.add(instruction);
+                }
+            }
+
+            events.add(new ProcessEvent(type, instructions));
+        }
+
+        return events;
+    }
+
     private DoorProcess dequeueNewProcess() {
         try {
             return newProcesses.dequeue();
@@ -92,6 +190,7 @@ public class ProcessManagerImpl implements ProcessManager {
             throw new IllegalStateException("No hay procesos nuevos para preparar", e);
         }
     }
+
 
     private String formatNewPendingProcessLog(DoorProcess process) {
         return "[" + LocalDateTime.now().format(LOG_TIMESTAMP_FORMAT) + "]: "

@@ -1,10 +1,9 @@
 package uy.edu.um.doors;
 
 import uy.edu.um.doors.model.DoorProcess;
-import uy.edu.um.doors.model.ProcessPriorityKey;
 import uy.edu.um.doors.model.ProcessState;
-import uy.edu.um.tad.binarytree.MySearchBinaryTree;
-import uy.edu.um.tad.binarytree.MySearchBinaryTreeImpl;
+import uy.edu.um.tad.heap.MyHeap;
+import uy.edu.um.tad.heap.MyHeapImpl;
 import uy.edu.um.tad.queue.EmptyQueueException;
 import uy.edu.um.tad.queue.MyQueue;
 import uy.edu.um.tad.queue.MyQueueImpl;
@@ -34,7 +33,7 @@ public class ProcessManagerImpl implements ProcessManager {
     private static final DateTimeFormatter LOG_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final MyQueue<DoorProcess> newProcesses = new MyQueueImpl<>();
-    private final MySearchBinaryTree<ProcessPriorityKey, DoorProcess> pendingProcesses = new MySearchBinaryTreeImpl<>();
+    private final MyHeap<DoorProcess> pendingProcesses = new MyHeapImpl<>(false);
     private DoorProcess runningProcess;
     private final MyHash<Integer, DoorUser> users = new MyHashImpl<>();
 
@@ -54,7 +53,7 @@ public class ProcessManagerImpl implements ProcessManager {
             DoorProcess process = dequeueNewProcess();
             process.calculatePriority();
             process.setState(ProcessState.PENDING);
-            pendingProcesses.add(new ProcessPriorityKey(process.getPriority(), process.getPid()), process);
+            pendingProcesses.insert(process);
             appendLog(formatNewPendingProcessLog(process));
             preparedProcesses++;
         }

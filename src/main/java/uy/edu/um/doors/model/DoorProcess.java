@@ -2,7 +2,7 @@ package uy.edu.um.doors.model;
 
 import uy.edu.um.tad.list.MyList;
 
-public class DoorProcess {
+public class DoorProcess implements Comparable<DoorProcess> {
     private final int pid;
     private final String name;
     private final DoorUser user;
@@ -87,4 +87,10 @@ public class DoorProcess {
         int eventWeight = ((8 * cpuEvents) + (2 * ramEvents) + (2 * diskEvents)) / totalEvents;
         priority = eventWeight + (user.getPriorityWeight() * totalEvents);
     }
+
+    @Override
+    public int compareTo(DoorProcess other) {
+        return Integer.compare(this.priority, other.priority);
+    }
+
 }

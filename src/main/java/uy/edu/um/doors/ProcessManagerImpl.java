@@ -1,26 +1,25 @@
 package uy.edu.um.doors;
 
-import uy.edu.um.doors.model.DoorProcess;
-import uy.edu.um.doors.model.ProcessState;
+import uy.edu.um.doors.model.*;
 import uy.edu.um.tad.heap.EmptyHeapException;
 import uy.edu.um.tad.heap.MyHeap;
 import uy.edu.um.tad.heap.MyHeapImpl;
 import uy.edu.um.tad.queue.EmptyQueueException;
 import uy.edu.um.tad.queue.MyQueue;
 import uy.edu.um.tad.queue.MyQueueImpl;
-import uy.edu.um.doors.model.DoorUser;
-import uy.edu.um.doors.model.UserType;
 import uy.edu.um.tad.hash.MyHash;
 import uy.edu.um.tad.hash.MyHashImpl;
 import java.io.BufferedReader;
 import java.io.FileReader;
-import uy.edu.um.doors.model.ProcessEvent;
+
+
 import uy.edu.um.tad.list.MyList;
 import uy.edu.um.tad.list.MyLinkedListImpl;
-import uy.edu.um.doors.model.EventType;
 import uy.edu.um.tad.stack.MyStack;
 import uy.edu.um.tad.stack.MyStackImpl;
 import uy.edu.um.tad.stack.EmptyStackException;
+import uy.edu.um.doors.model.FinishState;
+
 
 
 import java.io.IOException;
@@ -88,19 +87,23 @@ public class ProcessManagerImpl implements ProcessManager {
 
     @Override
     public void finishProcessOk() {
-        System.out.println("IMPLEMENTAR");
+        finishRunningProcess(FinishState.OK, null);
     }
 
     @Override
     public void finishProcessError() {
-        System.out.println("IMPLEMENTAR");
+        finishRunningProcess(FinishState.ERROR, null);
     }
 
     @Override
     public void terminateProcess(int uid) {
-        System.out.println("IMPLEMENTAR");
+        DoorUser terminatedBy = users.get(uid);
+        if (terminatedBy == null) {
+            System.out.println("No existe el usuario con UID:" + uid);
+            return;
+        }
+        finishRunningProcess(FinishState.TERMINATED, terminatedBy);
     }
-
     @Override
     public void printStatus() {
         System.out.println("IMPLEMENTAR");
@@ -158,6 +161,7 @@ public class ProcessManagerImpl implements ProcessManager {
 
                     DoorProcess process = new DoorProcess(pid, name, user, events);
                     newProcesses.enqueue(process);
+                    processesByPid.put(pid, process);
                 }
                 line = reader.readLine();
             }
@@ -211,6 +215,33 @@ public class ProcessManagerImpl implements ProcessManager {
         }
     }
 
+    private void finishRunningProcess(FinishState finishState, DoorUser terminatedBy) {
+        if (runningProcess == null) {
+            System.out.println("No hay ningun proceso en ejecucion.");
+            return;
+        }
+        DoorProcess process = runningProcess;
+        process.finish(finishState, terminatedBy);
+        appendLog(formatEndingProcessLog(process));
+
+        if (finishedProcesses.size() == ProcessManager.MAX_FINISHED_PROCESS_ON_RAM) {
+            appendLog(formatStackOverflowLog());
+            while (!finishedProcesses.isEmpty()) {
+                DoorProcess removed;
+                try {
+                    removed = finishedProcesses.pop();
+                } catch (EmptyStackException e) {
+                    break;
+                }
+                appendLog(formatFinishedInStackLog(removed));
+                processesByPid.remove(removed.getPid());
+            }
+        }
+
+        finishedProcesses.push(process);
+        runningProcess = null;
+    }
+
 
     private String formatNewPendingProcessLog(DoorProcess process) {
         return "[" + LocalDateTime.now().format(LOG_TIMESTAMP_FORMAT) + "]: "
@@ -235,6 +266,30 @@ public class ProcessManagerImpl implements ProcessManager {
             sb.append(" | Instructions ").append(instructionsToString(event.getInstructions()));
         }
         return sb.toString();
+    }
+
+    private String formatEndingProcessLog(DoorProcess process) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("[").append(LocalDateTime.now().format(LOG_TIMESTAMP_FORMAT)).append("]: ");
+        sb.append("ENDING PROCESS: PID=").append(process.getPid());
+        sb.append(" | STATE: ").append(process.getFinishState());
+        if (process.getFinishState() == FinishState.TERMINATED) {
+            sb.append(" by USER:").append(process.getTerminatedBy().getAlias());
+            sb.append(" UID:").append(process.getTerminatedBy().getUid());
+        }
+        return sb.toString();
+    }
+
+    private String formatStackOverflowLog() {
+        return "[" + LocalDateTime.now().format(LOG_TIMESTAMP_FORMAT) + "]: "
+                + "Finished process stack overflow";
+    }
+
+    private String formatFinishedInStackLog(DoorProcess process) {
+        return "PID=" + process.getPid() + " " + process.getName()
+                + " | STATE: " + process.getFinishState()
+                + " | USER:" + process.getUser().getAlias()
+                + " UID:" + process.getUser().getUid();
     }
 
     private void appendLog(String line) {

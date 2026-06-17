@@ -2,6 +2,7 @@ package uy.edu.um.doors;
 
 import uy.edu.um.doors.model.DoorProcess;
 import uy.edu.um.doors.model.ProcessState;
+import uy.edu.um.tad.heap.EmptyHeapException;
 import uy.edu.um.tad.heap.MyHeap;
 import uy.edu.um.tad.heap.MyHeapImpl;
 import uy.edu.um.tad.queue.EmptyQueueException;
@@ -17,6 +18,9 @@ import uy.edu.um.doors.model.ProcessEvent;
 import uy.edu.um.tad.list.MyList;
 import uy.edu.um.tad.list.MyLinkedListImpl;
 import uy.edu.um.doors.model.EventType;
+import uy.edu.um.tad.stack.MyStack;
+import uy.edu.um.tad.stack.MyStackImpl;
+import uy.edu.um.tad.stack.EmptyStackException;
 
 
 import java.io.IOException;
@@ -36,6 +40,8 @@ public class ProcessManagerImpl implements ProcessManager {
     private final MyHeap<DoorProcess> pendingProcesses = new MyHeapImpl<>(false);
     private DoorProcess runningProcess;
     private final MyHash<Integer, DoorUser> users = new MyHashImpl<>();
+    private final MyStack<DoorProcess> finishedProcesses = new MyStackImpl<>();
+    private final MyHash<Integer, DoorProcess> processesByPid = new MyHashImpl<>();
 
     @Override
     public void loadProcessAndUserData(String processCsvPath, String usersCsvPath) {
@@ -62,8 +68,23 @@ public class ProcessManagerImpl implements ProcessManager {
 
     @Override
     public void executeNextProcess() {
-        System.out.println("IMPLEMENTAR");
+        if (runningProcess != null) {
+            System.out.println("Ya hay un proceso en ejecucion (PID=" + runningProcess.getPid() + ").");
+            return;
+        }
+        if (pendingProcesses.isEmpty()) {
+            System.out.println("No hay procesos pendientes para ejecutar.");
+            return;
+        }
+        try {
+            runningProcess = pendingProcesses.remove();
+        } catch (EmptyHeapException e) {
+            return;
+        }
+        runningProcess.setState(ProcessState.RUNNING);
+        appendLog(formatExecutingProcessLog(runningProcess));
     }
+
 
     @Override
     public void finishProcessOk() {
@@ -200,6 +221,22 @@ public class ProcessManagerImpl implements ProcessManager {
                 + " | P=" + process.getPriority();
     }
 
+    private String formatExecutingProcessLog(DoorProcess process) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("[").append(LocalDateTime.now().format(LOG_TIMESTAMP_FORMAT)).append("]: ");
+        sb.append("EXECUTING PROCESS: PID=").append(process.getPid());
+        sb.append(" | USER:").append(process.getUser().getAlias());
+        sb.append(" UID:").append(process.getUser().getUid());
+        MyList<ProcessEvent> events = process.getEvents();
+        for (int i = 0; i < events.size(); i++) {
+            ProcessEvent event = events.get(i);
+            sb.append(System.lineSeparator());
+            sb.append("EVENT: ").append(event.getType());
+            sb.append(" | Instructions ").append(instructionsToString(event.getInstructions()));
+        }
+        return sb.toString();
+    }
+
     private void appendLog(String line) {
         Path logPath = Path.of("DOORS_PROCESS_LOG_" + LocalDate.now().format(LOG_DATE_FORMAT));
         try {
@@ -213,4 +250,16 @@ public class ProcessManagerImpl implements ProcessManager {
             throw new RuntimeException("No se pudo escribir el log de procesos", e);
         }
     }
+    private String instructionsToString(MyList<String> instructions) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < instructions.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(instructions.get(i));
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
 }

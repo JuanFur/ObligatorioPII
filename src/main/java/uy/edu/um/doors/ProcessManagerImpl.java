@@ -41,7 +41,8 @@ public class ProcessManagerImpl implements ProcessManager {
     private final MyHash<Integer, DoorUser> users = new MyHashImpl<>();
     private final MyStack<DoorProcess> finishedProcesses = new MyStackImpl<>();
     private final MyHash<Integer, DoorProcess> processesByPid = new MyHashImpl<>();
-    @Override
+
+    @Override
     public void loadProcessAndUserData(String processCsvPath, String usersCsvPath) {
         loadUsers(usersCsvPath);
         System.out.println("Usuarios cargados: " + users.size());
@@ -105,22 +106,71 @@ public class ProcessManagerImpl implements ProcessManager {
     }
     @Override
     public void printStatus() {
-        System.out.println("IMPLEMENTAR");
+        printStatusInternal(false);
     }
-
     @Override
     public void printStatusVerbose() {
-        System.out.println("IMPLEMENTAR");
+        printStatusInternal(true);
+    }
+    private void printStatusInternal(boolean verbose) {
+        System.out.println("PROCESS STATUS");
+        System.out.println("EXECUTING:");
+        if (runningProcess != null) {
+            printProcessLine(runningProcess, verbose);
+        }
+        System.out.println("PENDING:");
+        MyList<DoorProcess> ordered = drainPendingOrdered();
+        for (int i = 0; i < ordered.size(); i++) {
+            printProcessLine(ordered.get(i), verbose);
+        }
+        System.out.println("FINISHED:");
+        MyList<DoorProcess> finished = drainFinishedOrdered();
+        for (int i = 0; i < finished.size(); i++) {
+            printFinishedLine(finished.get(i), verbose);
+        }
     }
 
     @Override
     public void printStatusByUser(int uid) {
-        System.out.println("IMPLEMENTAR");
+        DoorUser user = users.get(uid);
+        if (user == null) {
+            System.out.println("No existe el usuario con UID:" + uid);
+            return;
+        }
+        System.out.println("PROCESS STATUS for USER:" + user.getAlias() + " UID:" + uid);
+        if (runningProcess != null && runningProcess.getUser().getUid() == uid) {
+            System.out.println("EXECUTING:");
+            printProcessLine(runningProcess, false);
+        }
+        System.out.println("PENDING:");
+        MyList<DoorProcess> ordered = drainPendingOrdered();
+        for (int i = 0; i < ordered.size(); i++) {
+            if (ordered.get(i).getUser().getUid() == uid) {
+                printProcessLine(ordered.get(i), false);
+            }
+        }
+        System.out.println("FINISHED:");
+        MyList<DoorProcess> finished = drainFinishedOrdered();
+        for (int i = 0; i < finished.size(); i++) {
+            DoorProcess p = finished.get(i);
+            if (p.getUser().getUid() == uid) {
+                printFinishedLine(p, false);
+            }
+        }
     }
 
     @Override
     public void printStatusByProcess(int pid) {
-        System.out.println("IMPLEMENTAR");
+        DoorProcess process = processesByPid.get(pid);
+        if (process == null) {
+            System.out.println("No existe el proceso con PID:" + pid);
+            return;
+        }
+        if (process.getState() == ProcessState.FINISHED) {
+            printFinishedLine(process, true);
+        } else {
+            printProcessLine(process, true);
+        }
     }
 
     private void loadUsers(String usersCsvPath) {
@@ -168,6 +218,34 @@ public class ProcessManagerImpl implements ProcessManager {
             System.out.println("ERROR leyendo procesos: " + e.getMessage());
         }
     }
+
+    private void printProcessLine(DoorProcess process, boolean verbose) {
+        System.out.println("PID=" + process.getPid() + " | " + process.getName()
+                + " | USER:" + process.getUser().getAlias()
+                + " UID:" + process.getUser().getUid()
+                + " | P=" + process.getPriority());
+        if (verbose) {
+            printEvents(process);
+        }
+    }
+    private void printFinishedLine(DoorProcess process, boolean verbose) {
+        System.out.println("PID=" + process.getPid() + " " + process.getName()
+                + " | STATE: " + process.getFinishState()
+                + " | USER:" + process.getUser().getAlias()
+                + " UID:" + process.getUser().getUid());
+        if (verbose) {
+            printEvents(process);
+        }
+    }
+    private void printEvents(DoorProcess process) {
+        MyList<ProcessEvent> events = process.getEvents();
+        for (int i = 0; i < events.size(); i++) {
+            ProcessEvent event = events.get(i);
+            System.out.println(" EVENT: " + event.getType()
+                    + " | Instructions " + instructionsToString(event.getInstructions()));
+        }
+    }
+
     private MyList<ProcessEvent> parseEvents(String eventsBlock) {
         MyList<ProcessEvent> events = new MyLinkedListImpl<>();
         String content = eventsBlock.trim();
@@ -204,6 +282,36 @@ public class ProcessManagerImpl implements ProcessManager {
         }
 
         return events;
+    }
+
+    private MyList<DoorProcess> drainPendingOrdered() {
+        MyList<DoorProcess> ordered = new MyLinkedListImpl<>();
+        while (!pendingProcesses.isEmpty()) {
+            try {
+                ordered.add(pendingProcesses.remove());
+            } catch (EmptyHeapException e) {
+                break;
+            }
+        }
+        for (int i = 0; i < ordered.size(); i++) {
+            pendingProcesses.insert(ordered.get(i));
+        }
+        return ordered;
+    }
+
+    private MyList<DoorProcess> drainFinishedOrdered() {
+        MyList<DoorProcess> ordered = new MyLinkedListImpl<>();
+        while (!finishedProcesses.isEmpty()) {
+            try {
+                ordered.add(finishedProcesses.pop());
+            } catch (EmptyStackException e) {
+                break;
+            }
+        }
+        for (int i = ordered.size() - 1; i >= 0; i--) {
+            finishedProcesses.push(ordered.get(i));
+        }
+        return ordered;
     }
 
     private DoorProcess dequeueNewProcess() {
@@ -299,7 +407,7 @@ public class ProcessManagerImpl implements ProcessManager {
                     StandardOpenOption.APPEND
             );
         } catch (IOException e) {
-            throw new RuntimeException("No se pudo escribir el log de procesos", e);
+            throw new RuntimeException("No se comopudo escribir el log de procesos", e);
         }
     }
     private String instructionsToString(MyList<String> instructions) {
@@ -313,5 +421,4 @@ public class ProcessManagerImpl implements ProcessManager {
         res += "]";
         return res;
     }
-
 }

@@ -41,8 +41,7 @@ public class ProcessManagerImpl implements ProcessManager {
     private final MyHash<Integer, DoorUser> users = new MyHashImpl<>();
     private final MyStack<DoorProcess> finishedProcesses = new MyStackImpl<>();
     private final MyHash<Integer, DoorProcess> processesByPid = new MyHashImpl<>();
-
-    @Override
+    @Override
     public void loadProcessAndUserData(String processCsvPath, String usersCsvPath) {
         loadUsers(usersCsvPath);
         System.out.println("Usuarios cargados: " + users.size());
@@ -253,31 +252,29 @@ public class ProcessManagerImpl implements ProcessManager {
     }
 
     private String formatExecutingProcessLog(DoorProcess process) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("[").append(LocalDateTime.now().format(LOG_TIMESTAMP_FORMAT)).append("]: ");
-        sb.append("EXECUTING PROCESS: PID=").append(process.getPid());
-        sb.append(" | USER:").append(process.getUser().getAlias());
-        sb.append(" UID:").append(process.getUser().getUid());
+        String result = "[" + LocalDateTime.now().format(LOG_TIMESTAMP_FORMAT) + "]: "
+                + "EXECUTING PROCESS: PID=" + process.getPid()
+                + " | USER:" + process.getUser().getAlias()
+                + " UID:" + process.getUser().getUid();
         MyList<ProcessEvent> events = process.getEvents();
         for (int i = 0; i < events.size(); i++) {
             ProcessEvent event = events.get(i);
-            sb.append(System.lineSeparator());
-            sb.append("EVENT: ").append(event.getType());
-            sb.append(" | Instructions ").append(instructionsToString(event.getInstructions()));
+            result = result + System.lineSeparator()
+                    + "EVENT: " + event.getType()
+                    + " | Instructions " + instructionsToString(event.getInstructions());
         }
-        return sb.toString();
+        return result;
     }
 
     private String formatEndingProcessLog(DoorProcess process) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("[").append(LocalDateTime.now().format(LOG_TIMESTAMP_FORMAT)).append("]: ");
-        sb.append("ENDING PROCESS: PID=").append(process.getPid());
-        sb.append(" | STATE: ").append(process.getFinishState());
+        String result = "[" + LocalDateTime.now().format(LOG_TIMESTAMP_FORMAT) + "]: "
+                + "ENDING PROCESS: PID=" + process.getPid()
+                + " | STATE: " + process.getFinishState();
         if (process.getFinishState() == FinishState.TERMINATED) {
-            sb.append(" by USER:").append(process.getTerminatedBy().getAlias());
-            sb.append(" UID:").append(process.getTerminatedBy().getUid());
+            result = result + " by USER:" + process.getTerminatedBy().getAlias()
+                    + " UID:" + process.getTerminatedBy().getUid();
         }
-        return sb.toString();
+        return result;
     }
 
     private String formatStackOverflowLog() {
@@ -306,15 +303,15 @@ public class ProcessManagerImpl implements ProcessManager {
         }
     }
     private String instructionsToString(MyList<String> instructions) {
-        StringBuilder sb = new StringBuilder("[");
+        String res = "[";
         for (int i = 0; i < instructions.size(); i++) {
             if (i > 0) {
-                sb.append(", ");
+                res += ", ";
             }
-            sb.append(instructions.get(i));
+            res += instructions.get(i);
         }
-        sb.append("]");
-        return sb.toString();
+        res += "]";
+        return res;
     }
 
 }

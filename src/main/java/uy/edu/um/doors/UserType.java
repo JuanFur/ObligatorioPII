@@ -1,4 +1,4 @@
-package uy.edu.um.doors.model;
+package uy.edu.um.doors;
 
 public enum UserType {
     ADMIN(32),

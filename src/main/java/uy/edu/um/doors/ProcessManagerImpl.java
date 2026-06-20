@@ -1,6 +1,5 @@
 package uy.edu.um.doors;
 
-import uy.edu.um.doors.model.*;
 import uy.edu.um.tad.heap.EmptyHeapException;
 import uy.edu.um.tad.heap.MyHeap;
 import uy.edu.um.tad.heap.MyHeapImpl;
@@ -18,7 +17,6 @@ import uy.edu.um.tad.list.MyLinkedListImpl;
 import uy.edu.um.tad.stack.MyStack;
 import uy.edu.um.tad.stack.MyStackImpl;
 import uy.edu.um.tad.stack.EmptyStackException;
-import uy.edu.um.doors.model.FinishState;
 
 
 
